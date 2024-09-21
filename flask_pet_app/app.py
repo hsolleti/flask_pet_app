@@ -1,35 +1,26 @@
-from flask import Flask, render_template
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, redirect, url_for
+from models import db, Pet
+from forms import PetForm
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pets.db'
-db = SQLAlchemy(app)
+app.config['SECRET_KEY'] = 'your_secret_key'
+db.init_app(app)
 
-class Pet(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    age = db.Column(db.Integer, nullable=False)
-    species = db.Column(db.String(80), nullable=False)
+# Initialize the database when the app starts
+with app.app_context():
+    db.create_all()
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    pets = Pet.query.all()
-    return render_template('view_pets.html', pets=pets)
-
-def add_sample_data():
-    # Check if the table is empty before adding sample data
-    if Pet.query.count() == 0:
-        sample_pets = [
-            Pet(name='Buddy', age=3, species='Dog'),
-            Pet(name='Mittens', age=2, species='Cat'),
-            Pet(name='Goldie', age=1, species='Fish'),
-        ]
-        db.session.bulk_save_objects(sample_pets)
+    form = PetForm()
+    if form.validate_on_submit():
+        pet = Pet(name=form.name.data, age=form.age.data, type=form.type.data)
+        db.session.add(pet)
         db.session.commit()
+        return redirect(url_for('index'))
+    pets = Pet.query.all()
+    return render_template('view_pets.html', form=form, pets=pets)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.drop_all()  # Drops all tables
-        db.create_all()  # Creates tables again
-        add_sample_data()  # Add sample pets
     app.run(debug=True)
